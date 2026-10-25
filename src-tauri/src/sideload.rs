@@ -50,6 +50,7 @@ pub async fn sideload(
     device_state: State<'_, DeviceInfoMutex>,
     sideloader_state: State<'_, SideloaderMutex>,
     app_path: String,
+    bundle_id: Option<String>,
 ) -> Result<Option<SpecialApp>, AppError> {
     let device = {
         let device_lock = device_state.lock().unwrap();
@@ -63,11 +64,51 @@ pub async fn sideload(
 
     let mut sideloader = SideloaderGuard::take(&sideloader_state)?;
 
+    let app_path_to_use = if let Some(bid) = bundle_id.filter(|s| !s.trim().is_empty()) {
+        let tmp_ipa = format!("{}.reid.ipa", app_path);
+        let script = r#"
+import os, sys, zipfile, plistlib, shutil
+src = sys.argv[1]; out = sys.argv[2]; new_id = sys.argv[3]
+tmp = out + "_extracted"
+if os.path.exists(tmp): shutil.rmtree(tmp)
+os.makedirs(tmp)
+with zipfile.ZipFile(src) as z:
+    z.extractall(tmp)
+payload = os.path.join(tmp, "Payload")
+app_dirs = [d for d in os.listdir(payload) if d.endswith(".app")]
+app_dir = os.path.join(payload, app_dirs[0])
+plist_path = os.path.join(app_dir, "Info.plist")
+with open(plist_path, "rb") as f:
+    pl = plistlib.load(f)
+pl["CFBundleIdentifier"] = new_id
+with open(plist_path, "wb") as f:
+    plistlib.dump(pl, f)
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+    for root, _, files in os.walk(tmp):
+        for fn in files:
+            full = os.path.join(root, fn)
+            arc = os.path.relpath(full, tmp)
+            zout.write(full, arc)
+print("ok")
+"#;
+        let res = std::process::Command::new("python3")
+            .arg("-c").arg(script)
+            .arg(&app_path).arg(&tmp_ipa).arg(&bid)
+            .output()
+            .map_err(|e| AppError::Misc(format!("Failed to rewrite bundle id: {}", e)))?;
+        if !res.status.success() {
+            return Err(AppError::Misc(String::from_utf8_lossy(&res.stderr).trim().to_string()));
+        }
+        tmp_ipa
+    } else {
+        app_path.clone()
+    };
+
     let special = sideloader
         .get_mut()
         .install_app(
             &provider,
-            app_path.into(),
+            app_path_to_use.into(),
             false,
             None::<fn(f32) -> std::future::Ready<()>>,
             Some(&device.pairing),
@@ -83,12 +124,13 @@ pub async fn sideload_operation(
     device_state: State<'_, DeviceInfoMutex>,
     sideloader_state: State<'_, SideloaderMutex>,
     app_path: String,
+    bundle_id: Option<String>,
 ) -> Result<(), AppError> {
     let op = Operation::new("sideload".to_string(), &window);
     op.start("install")?;
     op.fail_if_err(
         "install",
-        sideload(device_state, sideloader_state, app_path).await,
+        sideload(device_state, sideloader_state, app_path, bundle_id).await,
     )?;
     op.complete("install")?;
     Ok(())
@@ -150,6 +192,7 @@ pub async fn install_sidestore_operation(
             device_state,
             sideloader_state,
             dest.to_string_lossy().to_string(),
+            None,
         )
         .await,
     )?;

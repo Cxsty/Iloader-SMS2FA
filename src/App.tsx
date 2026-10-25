@@ -384,8 +384,10 @@ function App() {
                       ],
                     });
                     if (!path) return;
+                    const bundleId = window.prompt("Optional: reuse an existing app ID base (e.g. com.foo.app). Leave empty for original.") || "";
                     startOperation(sideloadOperation, {
                       appPath: path as string,
+                      bundleId: bundleId || null,
                     }).catch((e) => {
                       console.log(e.type);
                       console.error(e.message);
