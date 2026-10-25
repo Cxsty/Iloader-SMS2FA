@@ -1,3 +1,9 @@
+# SUPPORT THIS PROJECT
+
+**Please support development: visit https://cxsty.github.io and press Support.**
+
+---
+
 <a href="https://iloader.app">
   <picture align="left" >
     <source media="(prefers-color-scheme: dark)" srcset="/iloader.svg">
