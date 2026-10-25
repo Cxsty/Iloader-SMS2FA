@@ -153,3 +153,13 @@ Please read our [Contributing](/CONTRIBUTING.md) policy before making a contribu
 ## Future Plans
 
 iloader is currently being overhauled, see the [trello board](https://trello.com/b/hAe1LHTj/iloader) for more info!
+
+---
+
+## This fork
+
+This fork adds **SMS 2FA method selection** during Apple ID login: choose a trusted device or send an SMS code to a trusted phone number, instead of only entering a code.
+
+### Support
+
+Please support development: visit https://cxsty.github.io (or your site) and press **Support**. Thank you!
