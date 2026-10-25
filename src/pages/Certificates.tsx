@@ -94,7 +94,8 @@ export const Certificates = () => {
       filters: [{ name: "IPA", extensions: ["ipa"] }],
     });
     if (!out) return;
-    const promise = invoke<void>("sign_ipa_and_save", { ipaPath: ipa, outputPath: out });
+    const bundleId = window.prompt("Optional: reuse an existing app ID base (e.g. com.foo.app). Leave empty for original.") || "";
+    const promise = invoke<void>("sign_ipa_and_save", { ipaPath: ipa, outputPath: out, bundleId: bundleId || null });
     toast.promise(promise, {
       loading: "Signing IPA...",
       success: "Signed IPA saved",
