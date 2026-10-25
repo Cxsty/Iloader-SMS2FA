@@ -176,17 +176,38 @@ async fn login(
                     .emit("2fa-required", params)
                     .context("Failed to emit 2fa-required event")?;
 
-                let (tx, rx) = std::sync::mpsc::channel::<String>();
-                let handler_id = window_clone.listen("2fa-recieved", move |event| {
-                    let code = event.payload();
-                    let _ = tx.send(code.to_string());
+                let (tx, rx) = std::sync::mpsc::channel::<TwoFactorCallbackResponse>();
+                let tx1 = tx.clone();
+                let h1 = window_clone.listen("2fa-submit", move |event| {
+                    let code = event.payload().trim_matches('"').to_string();
+                    let _ = tx1.send(TwoFactorCallbackResponse::SubmitCode(code));
+                });
+                let tx2 = tx.clone();
+                let h2 = window_clone.listen("2fa-send-sms", move |event| {
+                    let id: u32 = event.payload().trim_matches('"').parse().unwrap_or(0);
+                    let _ = tx2.send(TwoFactorCallbackResponse::SendSms(id));
+                });
+                let tx3 = tx.clone();
+                let h3 = window_clone.listen("2fa-send-devices", move |_| {
+                    let _ = tx3.send(TwoFactorCallbackResponse::SendToDevices);
+                });
+                let tx4 = tx.clone();
+                let h4 = window_clone.listen("2fa-resend", move |_| {
+                    let _ = tx4.send(TwoFactorCallbackResponse::ResendCode);
+                });
+                let tx5 = tx.clone();
+                let h5 = window_clone.listen("2fa-abort", move |_| {
+                    let _ = tx5.send(TwoFactorCallbackResponse::Abort);
                 });
 
                 let result = rx.recv_timeout(Duration::from_secs(120))?;
-                window_clone.unlisten(handler_id);
+                window_clone.unlisten(h1);
+                window_clone.unlisten(h2);
+                window_clone.unlisten(h3);
+                window_clone.unlisten(h4);
+                window_clone.unlisten(h5);
 
-                let code = result.trim_matches('"').to_string();
-                Ok(TwoFactorCallbackResponse::SubmitCode(code))
+                Ok(result)
             }
             .boxed()
         }

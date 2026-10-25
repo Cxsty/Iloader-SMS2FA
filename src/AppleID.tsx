@@ -29,6 +29,7 @@ export const AppleID = ({
   const [saveCredentials, setSaveCredentials] = useState<boolean>(false);
   const [tfaOpen, setTfaOpen] = useState<boolean>(false);
   const [tfaCode, setTfaCode] = useState<string>("");
+  const [tfaParams, setTfaParams] = useState<any>(null);
   const [addAccountOpen, setAddAccountOpen] = useState<boolean>(false);
   const [anisetteServer] = useStore<string>(
     "anisetteServer3-1",
@@ -64,7 +65,8 @@ export const AppleID = ({
   useEffect(() => {
     if (!listenerAdded.current) {
       (async () => {
-        const unlistenFn = await listen("2fa-required", () => {
+        const unlistenFn = await listen("2fa-required", (e) => {
+          setTfaParams(e.payload);
           setTfaOpen(true);
         });
         unlisten.current = unlistenFn;
@@ -276,7 +278,7 @@ export const AppleID = ({
               toast.warning(t("apple_id.valid_6digit"));
               return;
             }
-            await emit("2fa-recieved", tfaCode);
+            await emit("2fa-submit", tfaCode);
             setTfaOpen(false);
             setTfaCode("");
           }}
@@ -288,6 +290,25 @@ export const AppleID = ({
             onChange={(e) => setTfaCode(e.target.value)}
             style={{ marginRight: "0.5em" }}
           />
+          {tfaParams?.sms === false && (
+            <button type="button" onClick={() => emit("2fa-send-devices")}>
+              Send to devices
+            </button>
+          )}
+          {tfaParams?.numbers?.length > 0 && (
+            <div>
+              {tfaParams.numbers.map((n: any) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => emit("2fa-send-sms", n.id)}
+                >
+                  Send SMS to {n.lastTwoDigits}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => emit("2fa-resend")}>Resend</button>
           <button type="submit">{t("apple_id.submit")}</button>
         </form>
       </Modal>
