@@ -1,6 +1,6 @@
 # SUPPORT THIS PROJECT
 
-**Please support development: visit https://cxsty.github.io and press Support.**
+**Please support development: visit https://cxdevstudio.com and press Support.**
 
 ---
 
@@ -168,4 +168,4 @@ This fork adds **SMS 2FA method selection** during Apple ID login: choose a trus
 
 ### Support
 
-Please support development: visit https://cxsty.github.io (or your site) and press **Support**. Thank you!
+Please support development: visit https://cxdevstudio.com (or your site) and press **Support**. Thank you!
