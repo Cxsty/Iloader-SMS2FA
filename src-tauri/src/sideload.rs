@@ -77,12 +77,25 @@ with zipfile.ZipFile(src) as z:
 payload = os.path.join(tmp, "Payload")
 app_dirs = [d for d in os.listdir(payload) if d.endswith(".app")]
 app_dir = os.path.join(payload, app_dirs[0])
-plist_path = os.path.join(app_dir, "Info.plist")
-with open(plist_path, "rb") as f:
-    pl = plistlib.load(f)
-pl["CFBundleIdentifier"] = new_id
-with open(plist_path, "wb") as f:
-    plistlib.dump(pl, f)
+main_plist_path = os.path.join(app_dir, "Info.plist")
+with open(main_plist_path, "rb") as f:
+    main_pl = plistlib.load(f)
+old_id = main_pl.get("CFBundleIdentifier", "")
+main_pl["CFBundleIdentifier"] = new_id
+with open(main_plist_path, "wb") as f:
+    plistlib.dump(main_pl, f)
+# rewrite extension bundle ids by replacing old prefix
+for root, dirs, files in os.walk(payload):
+    for fn in files:
+        if fn == "Info.plist":
+            p = os.path.join(root, fn)
+            with open(p, "rb") as f:
+                pl = plistlib.load(f)
+            bid = pl.get("CFBundleIdentifier")
+            if isinstance(bid, str) and old_id and bid.startswith(old_id):
+                pl["CFBundleIdentifier"] = new_id + bid[len(old_id):]
+                with open(p, "wb") as f:
+                    plistlib.dump(pl, f)
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
     for root, _, files in os.walk(tmp):
         for fn in files:
