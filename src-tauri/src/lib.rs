@@ -14,7 +14,7 @@ mod operation;
 
 use crate::{
     account::{
-        delete_account, delete_app_id, get_certificates, invalidate_account, list_app_ids,
+        delete_account, delete_app_id, export_signing_certificate, extract_provisioning_profile, get_certificates, invalidate_account, list_app_ids, sign_ipa_and_save,
         logged_in_as, login_new, login_stored, reset_anisette_state, revoke_certificate,
     },
     device::{
@@ -113,7 +113,10 @@ pub fn run() {
             sideload_operation,
             set_selected_device,
             install_sidestore_operation,
+            export_signing_certificate,
+            extract_provisioning_profile,
             get_certificates,
+            sign_ipa_and_save,
             revoke_certificate,
             list_app_ids,
             delete_app_id,

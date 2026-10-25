@@ -1,5 +1,6 @@
 import "./Certificates.css";
 import { invoke } from "@tauri-apps/api/core";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useError } from "../ErrorContext";
@@ -52,6 +53,55 @@ export const Certificates = () => {
     [setCertificates, loadCertificates, t],
   );
 
+  const exportP12 = useCallback(async () => {
+    const path = await save({
+      defaultPath: "signing.p12",
+      filters: [{ name: "PKCS#12", extensions: ["p12"] }],
+    });
+    if (!path) return;
+    const password = window.prompt("p12 password (leave empty to use machine id)") || "";
+    const promise = invoke<void>("export_signing_certificate", { password, path });
+    toast.promise(promise, {
+      loading: "Exporting signing certificate...",
+      success: "Exported signing certificate",
+      error: (e) => err("Failed to export signing certificate", e),
+    });
+  }, [err]);
+  const extractProfile = useCallback(async () => {
+    const ipa = await open({
+      filters: [{ name: "IPA", extensions: ["ipa"] }],
+    });
+    if (!ipa || Array.isArray(ipa)) return;
+    const out = await save({
+      defaultPath: "embedded.mobileprovision",
+      filters: [{ name: "Provisioning", extensions: ["mobileprovision"] }],
+    });
+    if (!out) return;
+    const promise = invoke<void>("extract_provisioning_profile", { ipaPath: ipa, outputPath: out });
+    toast.promise(promise, {
+      loading: "Extracting provisioning profile...",
+      success: "Extracted provisioning profile",
+      error: (e) => err("Failed to extract provisioning profile", e),
+    });
+  }, [err]);
+  const signIpa = useCallback(async () => {
+    const ipa = await open({
+      filters: [{ name: "IPA", extensions: ["ipa"] }],
+    });
+    if (!ipa || Array.isArray(ipa)) return;
+    const out = await save({
+      defaultPath: "signed.ipa",
+      filters: [{ name: "IPA", extensions: ["ipa"] }],
+    });
+    if (!out) return;
+    const promise = invoke<void>("sign_ipa_and_save", { ipaPath: ipa, outputPath: out });
+    toast.promise(promise, {
+      loading: "Signing IPA...",
+      success: "Signed IPA saved",
+      error: (e) => err("Failed to sign IPA", e),
+    });
+  }, [err]);
+
   useEffect(() => {
     loadCertificates();
   }, []);
@@ -102,6 +152,24 @@ export const Certificates = () => {
           </div>
         </div>
       )}
+      <button
+        style={{ marginTop: "1em", width: "100%" }}
+        onClick={exportP12}
+      >
+        Export signing certificate (.p12)
+      </button>
+      <button
+        style={{ marginTop: "1em", width: "100%" }}
+        onClick={extractProfile}
+      >
+        Extract provisioning profile from IPA
+      </button>
+      <button
+        style={{ marginTop: "1em", width: "100%" }}
+        onClick={signIpa}
+      >
+        Sign IPA and save
+      </button>
       <button
         style={{ marginTop: "1em", width: "100%" }}
         onClick={loadCertificates}

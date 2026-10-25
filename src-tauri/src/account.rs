@@ -28,6 +28,7 @@ use crate::{
     secure_storage::create_sideloading_storage,
     sideload::{SideloaderGuard, SideloaderMutex},
 };
+use isideload::sideload::cert_identity::CertificateIdentity;
 
 #[tauri::command]
 pub async fn login_new(
@@ -326,6 +327,142 @@ pub async fn revoke_certificate(
     dev_session
         .revoke_development_cert(&team, &serial_number, None)
         .await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn export_signing_certificate(
+    handle: AppHandle,
+    sideloader_state: State<'_, SideloaderMutex>,
+    password: String,
+    path: String,
+) -> Result<(), AppError> {
+    let mut sideloader = SideloaderGuard::take(&sideloader_state)?;
+
+    let email = sideloader.get_mut().get_email().to_string();
+    let team = sideloader.get_mut().get_team().await?;
+    let dev_session = sideloader.get_mut().get_dev_session();
+
+    let storage = create_sideloading_storage(&handle)?;
+
+    let noop = |_certs: Vec<isideload::dev::certificates::DevelopmentCertificate>| async {
+        Ok(None)
+    };
+    let behavior = MaxCertsBehavior::Prompt(noop);
+
+    let identity = CertificateIdentity::retrieve(
+        "iloader",
+        &email,
+        dev_session,
+        &team,
+        &*storage,
+        &behavior,
+    )
+    .await
+    .map_err(|e| AppError::Misc(format!("Failed to retrieve signing certificate: {:?}", e)))?;
+
+    let p12_password = if password.is_empty() {
+        identity.machine_id.clone()
+    } else {
+        password
+    };
+
+    let bytes = identity
+        .as_p12(&p12_password)
+        .await
+        .map_err(|e| AppError::Misc(format!("Failed to build p12: {:?}", e)))?;
+
+    std::fs::write(&path, bytes)
+        .map_err(|e| AppError::Misc(format!("Failed to write p12 file: {}", e)))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn extract_provisioning_profile(ipa_path: String, output_path: String) -> Result<(), AppError> {
+    let script = r#"
+import zipfile, sys
+ipa = sys.argv[1]
+out = sys.argv[2]
+with zipfile.ZipFile(ipa) as z:
+    for n in z.namelist():
+        if n.endswith('embedded.mobileprovision'):
+            with open(out, 'wb') as f:
+                f.write(z.read(n))
+            print('ok')
+            sys.exit(0)
+print('embedded.mobileprovision not found in IPA')
+sys.exit(1)
+"#;
+    let result = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&ipa_path)
+        .arg(&output_path)
+        .output()
+        .map_err(|e| AppError::Misc(format!("Failed to run extractor: {}", e)))?;
+    if !result.status.success() {
+        return Err(AppError::Misc(
+            String::from_utf8_lossy(&result.stderr).trim().to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn sign_ipa_and_save(
+    sideloader_state: State<'_, SideloaderMutex>,
+    ipa_path: String,
+    output_path: String,
+) -> Result<(), AppError> {
+    let mut sideloader = SideloaderGuard::take(&sideloader_state)?;
+
+    let team = sideloader.get_mut().get_team().await?;
+
+    let (signed_app_path, _) = sideloader
+        .get_mut()
+        .sign_app(
+            std::path::PathBuf::from(&ipa_path),
+            Some(team),
+            false,
+            None::<fn(f32) -> std::future::Ready<()>>,
+            None,
+            None,
+        )
+        .await
+        .map_err(|e| AppError::Misc(format!("Failed to sign IPA: {:?}", e)))?;
+
+    let payload_dir = signed_app_path
+        .parent()
+        .ok_or_else(|| AppError::Misc("Invalid signed app path".into()))?
+        .to_path_buf();
+
+    let script = r#"
+import os, sys, zipfile
+payload_dir = sys.argv[1]
+out = sys.argv[2]
+base = os.path.dirname(payload_dir)
+with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+    for root, _, files in os.walk(payload_dir):
+        for f in files:
+            full = os.path.join(root, f)
+            arc = os.path.relpath(full, base)
+            z.write(full, arc)
+print('ok')
+"#;
+    let result = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&payload_dir)
+        .arg(&output_path)
+        .output()
+        .map_err(|e| AppError::Misc(format!("Failed to zip signed IPA: {}", e)))?;
+    if !result.status.success() {
+        return Err(AppError::Misc(
+            String::from_utf8_lossy(&result.stderr).trim().to_string(),
+        ));
+    }
 
     Ok(())
 }
