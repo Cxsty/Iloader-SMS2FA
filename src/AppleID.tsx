@@ -274,25 +274,45 @@ export const AppleID = ({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (tfaCode.length !== 6) {
+            const code = tfaCode.trim();
+            if (!/^\d{6}$/.test(code)) {
               toast.warning(t("apple_id.valid_6digit"));
               return;
             }
-            await emit("2fa-submit", tfaCode);
+            await emit("2fa-submit", code);
             setTfaOpen(false);
             setTfaCode("");
+            setTfaParams(null);
           }}
         >
           <input
             type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            maxLength={6}
             placeholder={t("apple_id.verification_placeholder")}
             value={tfaCode}
-            onChange={(e) => setTfaCode(e.target.value)}
+            onChange={(e) =>
+              setTfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+            }
             style={{ marginRight: "0.5em" }}
           />
+          {(tfaParams?.sms === false ||
+            (tfaParams?.numbers?.length ?? 0) > 0) && (
+            <p style={{ margin: "0.6em 0 0.4em", opacity: 0.85 }}>
+              {t("apple_id.two_factor_choose_method")}
+            </p>
+          )}
           {tfaParams?.sms === false && (
-            <button type="button" onClick={() => emit("2fa-send-devices")}>
-              Send to devices
+            <button
+              type="button"
+              onClick={async () => {
+                await emit("2fa-send-devices");
+                toast.success(t("apple_id.sent_to_devices"));
+              }}
+            >
+              {t("apple_id.send_to_devices")}
             </button>
           )}
           {tfaParams?.numbers?.length > 0 && (
@@ -301,15 +321,33 @@ export const AppleID = ({
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => emit("2fa-send-sms", n.id)}
+                  onClick={async () => {
+                    await emit("2fa-send-sms", n.id);
+                    toast.success(t("apple_id.sent_sms"));
+                  }}
                 >
-                  Send SMS to {n.lastTwoDigits}
+                  {t("apple_id.send_sms_to", {
+                    digits: n.lastTwoDigits ?? "••",
+                  })}
                 </button>
               ))}
             </div>
           )}
-          <button type="button" onClick={() => emit("2fa-resend")}>Resend</button>
+          <button type="button" onClick={() => emit("2fa-resend")}>
+            {t("apple_id.resend")}
+          </button>
           <button type="submit">{t("apple_id.submit")}</button>
+          <button
+            type="button"
+            onClick={async () => {
+              await emit("2fa-abort");
+              setTfaOpen(false);
+              setTfaCode("");
+              setTfaParams(null);
+            }}
+          >
+            {t("apple_id.cancel_login")}
+          </button>
         </form>
       </Modal>
       <Modal sizeFit isOpen={certs !== null} zIndex={2000}>
