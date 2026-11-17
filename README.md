@@ -1,8 +1,25 @@
-# SUPPORT THIS PROJECT
+# iloader — SMS 2FA fork
+
+> Fast, user-friendly sideloading companion with **SMS 2FA method selection** during Apple ID login.
+> Forked from [nab138/iloader](https://github.com/nab138/iloader). Upstream project: [iloader.app](https://iloader.app).
 
 **Please support development: visit https://cxdevstudio.com and press Support.**
 
----
+## What's new in this fork
+
+- Choose where your Apple 2FA code goes: trusted device **or SMS to a trusted phone number**
+- Translated 2FA buttons, digit-only 6-digit input with autofocus
+- Cancel login from the 2FA dialog (sends abort, no hang)
+- IPA import uses an inline App ID dialog instead of `window.prompt`
+- Faster feel: no blocking prompts, instant toast feedback on send/resend
+
+### 2FA in 3 steps
+
+1. Sign in with Apple ID
+2. When asked, pick **Send to trusted devices** or **Send SMS to ••XX**
+3. Enter 6-digit code. Use **Resend** if expired, **Cancel login** to abort.
+
+## Quick start (60 seconds)
 
 <a href="https://iloader.app">
   <picture align="left" >

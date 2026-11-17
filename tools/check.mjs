@@ -1,0 +1,21 @@
+import fs from "node:fs";
+const root = new URL("../", import.meta.url);
+const read = (p) => fs.readFileSync(new URL(p, root), "utf8");
+let fail = 0;
+const ok = (c, m) => { console.log((c ? "PASS" : "FAIL") + " " + m); if (!c) fail++; };
+const en = JSON.parse(read("src/locales/en.json"));
+for (const k of ["send_to_devices","send_sms_to","resend","two_factor_choose_method","sent_sms","sent_to_devices","cancel_login"]) ok(en.apple_id?.[k], "en.apple_id." + k);
+for (const k of ["bundle_title","bundle_hint","bundle_placeholder","bundle_confirm"]) ok(en.app?.[k], "en.app." + k);
+const apple = read("src/AppleID.tsx");
+ok(!apple.includes("Send SMS to {"), "no hardcoded Send SMS");
+ok(!apple.includes("Send to devices") || apple.includes('t("apple_id.send_to_devices")'), "send-to-devices i18n");
+ok(apple.includes('replace(/\\D/g'), "digit-only 2FA input");
+ok(apple.includes('2fa-abort'), "2FA cancel emits abort");
+const app = read("src/App.tsx");
+ok(!app.includes("window.prompt"), "no window.prompt");
+ok(app.includes("bundleModalOpen"), "inline bundle ID modal");
+const md = read("README.md");
+ok(md.includes("SMS 2FA"), "README mentions SMS 2FA");
+ok(md.includes("nab138/iloader"), "README credits upstream");
+if (fail) { console.log(fail + " FAILURES"); process.exit(1); }
+console.log("ALL CHECKS PASS");
