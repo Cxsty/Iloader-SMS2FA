@@ -40,6 +40,9 @@ function App() {
     null | "certificates" | "appids" | "pairing"
   >(null);
   const [version, setVersion] = useState<string>("");
+  const [ipaPath, setIpaPath] = useState<string | null>(null);
+  const [bundleIdInput, setBundleIdInput] = useState<string>("");
+  const [bundleModalOpen, setBundleModalOpen] = useState<boolean>(false);
 
   const refreshDevicesRef = useRef<(() => void) | null>(null);
 
@@ -384,14 +387,9 @@ function App() {
                       ],
                     });
                     if (!path) return;
-                    const bundleId = window.prompt("Optional: reuse an existing app ID base (e.g. com.foo.app). Leave empty for original.") || "";
-                    startOperation(sideloadOperation, {
-                      appPath: path as string,
-                      bundleId: bundleId || null,
-                    }).catch((e) => {
-                      console.log(e.type);
-                      console.error(e.message);
-                    });
+                    setIpaPath(path as string);
+                    setBundleIdInput("");
+                    setBundleModalOpen(true);
                   }}
                 >
                   {t("app.import_ipa")}
@@ -430,6 +428,45 @@ function App() {
       </Modal>
       <Modal isOpen={openModal === "pairing"} close={() => setOpenModal(null)}>
         <Pairing />
+      </Modal>
+      <Modal
+        sizeFit
+        isOpen={bundleModalOpen}
+        close={() => setBundleModalOpen(false)}
+      >
+        <h2>{t("app.bundle_title")}</h2>
+        <p style={{ opacity: 0.8 }}>{t("app.bundle_hint")}</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!ipaPath) {
+              setBundleModalOpen(false);
+              return;
+            }
+            const bundleId = bundleIdInput.trim() || null;
+            setBundleModalOpen(false);
+            startOperation(sideloadOperation, {
+              appPath: ipaPath as string,
+              bundleId,
+            }).catch((e) => {
+              console.log(e.type);
+              console.error(e.message);
+            });
+          }}
+        >
+          <input
+            type="text"
+            autoFocus
+            placeholder={t("app.bundle_placeholder")}
+            value={bundleIdInput}
+            onChange={(e) => setBundleIdInput(e.target.value)}
+            style={{ minWidth: "260px", marginRight: "0.5em" }}
+          />
+          <button type="submit">{t("app.bundle_confirm")}</button>
+          <button type="button" onClick={() => setBundleModalOpen(false)}>
+            {t("common.cancel")}
+          </button>
+        </form>
       </Modal>
     </main>
   );
